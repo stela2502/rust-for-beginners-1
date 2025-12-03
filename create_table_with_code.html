@@ -3,8 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Page not found - Rust for Beginners (Bioinformatics)</title>
-        <base href="/">
+        <title>Create a Rust Package - Rust for Beginners (Bioinformatics)</title>
 
 
         <!-- Custom HTML head -->
@@ -177,14 +176,263 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="document-not-found-404"><a class="header" href="#document-not-found-404">Document not found (404)</a></h1>
-<p>This URL is invalid, sorry. Please use the navigation bar or search to continue.</p>
+                        <h1 id="creating-a-rust-package-and-loading-data-hands-on"><a class="header" href="#creating-a-rust-package-and-loading-data-hands-on">Creating a Rust Package and Loading Data (Hands-On)</a></h1>
+<p>In this chapter we <strong>build a real Rust package</strong> that loads a numeric table from disk
+and stores it in a data structure we can later use for clustering (e.g. k-means).</p>
+<p>You will:</p>
+<p>✅ create a Rust package<br>✅ write a real data table struct<br>✅ load a file<br>✅ parse numeric values<br>✅ handle errors<br>✅ test your code</p>
+<p>This chapter is not theory. You will <strong>type this code</strong>.</p>
+<hr>
+<h1 id="1-create-a-new-package"><a class="header" href="#1-create-a-new-package">1. Create a new package</a></h1>
+<p>Open a terminal:</p>
+<pre><code class="language-bash">cargo new data_table --bin
+cd data_table
+</code></pre>
+<p>Project structure:</p>
+<pre><code>data_table/
+└── src/
+    └── main.rs
+</code></pre>
+<hr>
+<h1 id="2-add-dependencies"><a class="header" href="#2-add-dependencies">2. Add dependencies</a></h1>
+<p>Edit <code>Cargo.toml</code>:</p>
+<pre><code class="language-toml">[package]
+name = "data_table"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+</code></pre>
+<hr>
+<h1 id="3-create-module-structure"><a class="header" href="#3-create-module-structure">3. Create module structure</a></h1>
+<p>Create two new files:</p>
+<pre><code>src/
+  main.rs
+  lib.rs
+  data.rs
+</code></pre>
+<hr>
+<h1 id="4-hook-the-library-into-rust"><a class="header" href="#4-hook-the-library-into-rust">4. Hook the library into Rust</a></h1>
+<p>Edit <code>src/lib.rs</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub mod data;
+<span class="boring">}</span></code></pre>
+<p>This tells Rust that <code>data.rs</code> is part of your package.</p>
+<hr>
+<h1 id="5-implement-the-data-table"><a class="header" href="#5-implement-the-data-table">5. Implement the data table</a></h1>
+<p>Edit <code>src/data.rs</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::fs::File;
+use std::io::{BufRead, BufReader};
+
+/// A simple numeric table
+pub struct DataTable {
+    pub rows: usize,
+    pub cols: usize,
+    pub rownames: Vec&lt;String&gt;,
+    pub data: Vec&lt;f64&gt;,
+}
+
+impl DataTable {
+    /// Create a new empty table
+    pub fn new() -&gt; Self {
+        Self {
+            rows: 0,
+            cols: 0,
+            rownames: Vec::new(),
+            data: Vec::new(),
+        }
+    }
+
+    /// Load a TSV or CSV file
+    pub fn read_file(path: &amp;str, sep: char) -&gt; Self {
+        let file = File::open(path).expect("Cannot open file");
+        let reader = BufReader::new(file);
+
+        let mut table = DataTable::new();
+        let mut header = true;
+
+        for line in reader.lines() {
+            let line = line.expect("Read error");
+
+            // Skip header line
+            if header {
+                header = false;
+                continue;
+            }
+
+            let mut first = true;
+            let mut col_count = 0;
+
+            for mut val in line.split(sep) {
+                if first {
+                    table.rownames.push(val.to_string());
+                    first = false;
+                } else {
+                    val = val.trim();
+                    let v = match val.parse::&lt;f64&gt;() {
+                        Ok(n) =&gt; n,
+                        Err(_) =&gt; 0.0,
+                    };
+                    table.data.push(v);
+                    col_count += 1;
+                }
+            }
+
+            if table.cols == 0 {
+                table.cols = col_count;
+            }
+
+            table.rows += 1;
+        }
+
+        table
+    }
+
+    pub fn get(&amp;self, row: usize, col: usize) -&gt; f64 {
+        self.data[row * self.cols + col]
+    }
+
+    pub fn print(&amp;self) {
+        println!("rows: {}, cols: {}", self.rows, self.cols);
+
+        for r in 0..self.rows {
+            print!("{}\t", self.rownames[r]);
+            for c in 0..self.cols {
+                print!("{}\t", self.get(r, c));
+            }
+            println!();
+        }
+    }
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="6-explain-what-just-happened"><a class="header" href="#6-explain-what-just-happened">6. Explain what just happened</a></h1>
+<h2 id="the-struct"><a class="header" href="#the-struct">The struct</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct DataTable {
+    pub rows: usize,
+    pub cols: usize,
+    pub rownames: Vec&lt;String&gt;,
+    pub data: Vec&lt;f64&gt;,
+}
+<span class="boring">}</span></code></pre>
+<p>This is your first real <strong>data structure</strong>.</p>
+<p>We store:</p>
+<ul>
+<li>dimensions</li>
+<li>names</li>
+<li>flattened numeric matrix (<code>data</code>)</li>
+</ul>
+<p>This layout is efficient and perfect for k-means later.</p>
+<hr>
+<h2 id="parsing-numbers-safely"><a class="header" href="#parsing-numbers-safely">Parsing numbers safely</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let v = match val.parse::&lt;f64&gt;() {
+    Ok(n) =&gt; n,
+    Err(_) =&gt; 0.0,
+};
+<span class="boring">}</span></code></pre>
+<p>Rust refuses to assume input is valid.
+We choose to replace invalid values with <code>0.0</code>.</p>
+<hr>
+<h2 id="memory-layout"><a class="header" href="#memory-layout">Memory layout</a></h2>
+<p>Indexing logic:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>row * cols + col
+<span class="boring">}</span></code></pre>
+<p>This stores the table <strong>row-major</strong> — just like NumPy and C.</p>
+<hr>
+<h1 id="7-write-the-executable"><a class="header" href="#7-write-the-executable">7. Write the executable</a></h1>
+<p>Edit <code>src/main.rs</code>:</p>
+<pre class="playground"><code class="language-rust">use clap::Parser;
+use data_table::data::DataTable;
+
+#[derive(Parser)]
+struct Opts {
+    #[arg(short, long)]
+    data: String,
+
+    #[arg(short, long, default_value = "\t")]
+    sep: String,
+}
+
+fn main() {
+    let opts = Opts::parse();
+    let sep: char = opts.sep.chars().next().unwrap();
+
+    let table = DataTable::read_file(&amp;opts.data, sep);
+    table.print();
+}</code></pre>
+<hr>
+<h1 id="8-build-the-program"><a class="header" href="#8-build-the-program">8. Build the program</a></h1>
+<pre><code class="language-bash">cargo build -r
+</code></pre>
+<hr>
+<h1 id="9-run-on-a-real-file"><a class="header" href="#9-run-on-a-real-file">9. Run on a real file</a></h1>
+<p>Example <code>data.tsv</code>:</p>
+<pre><code>gene A B C
+g1 1.1 2.3 4.5
+g2 4.0 0.2 1.8
+</code></pre>
+<p>Run:</p>
+<pre><code class="language-bash">target/release/data_table -d data.tsv
+</code></pre>
+<p>You should see the table printed.</p>
+<hr>
+<h1 id="10-tests-you-should-test-your-code"><a class="header" href="#10-tests-you-should-test-your-code">10. Tests (you SHOULD test your code)</a></h1>
+<p>Add to <code>src/data.rs</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_mock_table() {
+        let input = "x\ta\tb\nc1\t1\t2\nc2\t3\t4";
+        std::fs::write("/tmp/test.tsv", input).unwrap();
+
+        let t = DataTable::read_file("/tmp/test.tsv", '\t');
+        assert_eq!(t.rows, 2);
+        assert_eq!(t.cols, 2);
+        assert_eq!(t.get(1, 1), 4.0);
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Run:</p>
+<pre><code class="language-bash">cargo test
+</code></pre>
+<hr>
+<h1 id="summary"><a class="header" href="#summary">Summary</a></h1>
+<p>You now built:</p>
+<p>✅ a real package<br>✅ a real data structure<br>✅ file parsing<br>✅ error handling<br>✅ indexing logic<br>✅ a test suite</p>
+<p>This is the foundation for:</p>
+<blockquote>
+<p>clustering, PCA, k-means, distance computation</p>
+</blockquote>
+<hr>
+<h1 id="next"><a class="header" href="#next">Next</a></h1>
+<p>Next chapter:
+<strong>Computing distances and centroids</strong></p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="rust_variables_intro.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
 
+                            <a rel="next prefetch" href="walkthrough_datatable.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -192,7 +440,13 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="rust_variables_intro.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
 
+                    <a rel="next prefetch" href="walkthrough_datatable.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
             </nav>
 
         </div>

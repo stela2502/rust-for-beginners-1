@@ -3,8 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Page not found - Rust for Beginners (Bioinformatics)</title>
-        <base href="/">
+        <title>Detailed - how does the function work? - Rust for Beginners (Bioinformatics)</title>
 
 
         <!-- Custom HTML head -->
@@ -177,14 +176,263 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="document-not-found-404"><a class="header" href="#document-not-found-404">Document not found (404)</a></h1>
-<p>This URL is invalid, sorry. Please use the navigation bar or search to continue.</p>
+                        <h1 id="walking-through-the-datatable-code-line-by-line"><a class="header" href="#walking-through-the-datatable-code-line-by-line">Walking Through the DataTable Code (Line by Line)</a></h1>
+<p>In this section we walk slowly and carefully through the <strong>entire <code>DataTable</code> implementation</strong>.
+This is the heart of your program. Understanding this file means you understand how Rust stores data.</p>
+<hr>
+<h1 id="1-importing-filesystem-and-io-tools"><a class="header" href="#1-importing-filesystem-and-io-tools">1. Importing filesystem and IO tools</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::fs::File;
+use std::io::{BufRead, BufReader};
+<span class="boring">}</span></code></pre>
+<p>These two lines bring in tools from Rust’s standard library:</p>
+<ul>
+<li><code>File</code> → open files from disk</li>
+<li><code>BufReader</code> → read files efficiently, line by line</li>
+<li><code>BufRead</code> → gives us <code>.lines()</code> to iterate over file lines</li>
+</ul>
+<p>Rust requires imports explicitly — nothing is magically available.</p>
+<hr>
+<h1 id="2-defining-the-datatable-structure"><a class="header" href="#2-defining-the-datatable-structure">2. Defining the DataTable structure</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct DataTable {
+    pub rows: usize,
+    pub cols: usize,
+    pub rownames: Vec&lt;String&gt;,
+    pub data: Vec&lt;f64&gt;,
+}
+<span class="boring">}</span></code></pre>
+<p>This defines a <strong>data structure</strong>.</p>
+<p>We store:</p>
+<ul>
+<li><code>rows</code> → number of rows</li>
+<li><code>cols</code> → number of columns</li>
+<li><code>rownames</code> → first column (e.g. gene names)</li>
+<li><code>data</code> → numeric values stored in one flat vector</li>
+</ul>
+<p>Rust does not have <em>classes</em> — it has <strong>structs</strong> and <code>impl</code> blocks.</p>
+<p>This design is intentional:</p>
+<p>We store the table as:</p>
+<pre><code>row-major order (flattened matrix)
+</code></pre>
+<p>Indexing is done by:</p>
+<pre><code>row * cols + col
+</code></pre>
+<p>Which makes numeric computation fast later.</p>
+<hr>
+<h1 id="3-constructor-creating-an-empty-table"><a class="header" href="#3-constructor-creating-an-empty-table">3. Constructor: creating an empty table</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn new() -&gt; Self {
+    Self {
+        rows: 0,
+        cols: 0,
+        rownames: Vec::new(),
+        data: Vec::new(),
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>This function creates a new empty table.</p>
+<p>Notes:</p>
+<ul>
+<li><code>Self</code> refers to <code>DataTable</code></li>
+<li><code>Vec::new()</code> creates empty vectors</li>
+<li>We initialize dimensions with <code>0</code></li>
+</ul>
+<p>Rust does not allow uninitialized memory. Everything is always valid.</p>
+<hr>
+<h1 id="4-loading-a-file"><a class="header" href="#4-loading-a-file">4. Loading a file</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn read_file(path: &amp;str, sep: char) -&gt; Self {
+<span class="boring">}</span></code></pre>
+<p>Function parameters:</p>
+<ul>
+<li><code>path</code> → path to file</li>
+<li><code>sep</code> → column separator (e.g. <code>\t</code> for TSV, <code>,</code> for CSV)</li>
+</ul>
+<p>Return value:</p>
+<pre><code>Self = DataTable
+</code></pre>
+<hr>
+<h1 id="5-open-and-wrap-the-file"><a class="header" href="#5-open-and-wrap-the-file">5. Open and wrap the file</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let file = File::open(path).expect("Cannot open file");
+let reader = BufReader::new(file);
+<span class="boring">}</span></code></pre>
+<ul>
+<li><code>File::open()</code> returns a <code>Result</code></li>
+<li><code>.expect()</code> crashes gracefully with a readable message</li>
+<li><code>BufReader</code> improves performance for large files</li>
+</ul>
+<hr>
+<h1 id="6-setting-up-state"><a class="header" href="#6-setting-up-state">6. Setting up state</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut table = DataTable::new();
+let mut header = true;
+<span class="boring">}</span></code></pre>
+<p>We prepare:</p>
+<ul>
+<li>an empty table</li>
+<li>a flag to skip the header row</li>
+</ul>
+<p>Rust forces explicit mutability:</p>
+<p><code>mut</code> → this value will change.</p>
+<hr>
+<h1 id="7-reading-line-by-line"><a class="header" href="#7-reading-line-by-line">7. Reading line by line</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>for line in reader.lines() {
+    let line = line.expect("Read error");
+<span class="boring">}</span></code></pre>
+<p>Why <code>expect()</code> again?</p>
+<p>Because:</p>
+<pre><code>line is Result&lt;String, Error&gt;
+</code></pre>
+<p>Rust never ignores failure.</p>
+<hr>
+<h1 id="8-skipping-header"><a class="header" href="#8-skipping-header">8. Skipping header</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if header {
+    header = false;
+    continue;
+}
+<span class="boring">}</span></code></pre>
+<p>We drop the first line and move on.</p>
+<hr>
+<h1 id="9-parsing-a-row"><a class="header" href="#9-parsing-a-row">9. Parsing a row</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut first = true;
+let mut col_count = 0;
+<span class="boring">}</span></code></pre>
+<p>Flags:</p>
+<ul>
+<li><code>first</code> → first column = row name</li>
+<li><code>col_count</code> → how many numeric columns did we see?</li>
+</ul>
+<hr>
+<h1 id="10-splitting-each-cell"><a class="header" href="#10-splitting-each-cell">10. Splitting each cell</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>for mut val in line.split(sep) {
+<span class="boring">}</span></code></pre>
+<ul>
+<li><code>.split(sep)</code> breaks the line</li>
+<li><code>mut val</code> because we want to overwrite it</li>
+<li>Each <code>val</code> is <code>&amp;str</code></li>
+</ul>
+<hr>
+<h1 id="11-first-column-row-names"><a class="header" href="#11-first-column-row-names">11. First column: row names</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if first {
+    table.rownames.push(val.to_string());
+    first = false;
+}
+<span class="boring">}</span></code></pre>
+<p>The first field is the row label.</p>
+<hr>
+<h1 id="12-parsing-numeric-values"><a class="header" href="#12-parsing-numeric-values">12. Parsing numeric values</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>val = val.trim();
+
+let v = match val.parse::&lt;f64&gt;() {
+    Ok(n) =&gt; n,
+    Err(_) =&gt; 0.0,
+};
+<span class="boring">}</span></code></pre>
+<p>Rust will NOT guess.
+Rust will NOT fake conversion.
+Rust forces correctness.</p>
+<p>If parsing fails:
+→ we replace with <code>0.0</code>.</p>
+<hr>
+<h1 id="13-store-values"><a class="header" href="#13-store-values">13. Store values</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>table.data.push(v);
+col_count += 1;
+<span class="boring">}</span></code></pre>
+<p>We append values in row-major order.</p>
+<hr>
+<h1 id="14-set-column-count-once"><a class="header" href="#14-set-column-count-once">14. Set column count once</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if table.cols == 0 {
+    table.cols = col_count;
+}
+<span class="boring">}</span></code></pre>
+<p>We set column count only for the first row.</p>
+<hr>
+<h1 id="15-increase-row-count"><a class="header" href="#15-increase-row-count">15. Increase row count</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>table.rows += 1;
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="16-return-the-object"><a class="header" href="#16-return-the-object">16. Return the object</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>table
+<span class="boring">}</span></code></pre>
+<p>Final expression = return value.</p>
+<p>No <code>return</code> keyword needed.</p>
+<hr>
+<h1 id="17-random-access-get-value"><a class="header" href="#17-random-access-get-value">17. Random access: get value</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn get(&amp;self, row: usize, col: usize) -&gt; f64 {
+    self.data[row * self.cols + col]
+}
+<span class="boring">}</span></code></pre>
+<p>This computes the index into the flat array.</p>
+<p>Memory layout:</p>
+<pre><code>[ row0 | row1 | row2 | ... ]
+</code></pre>
+<hr>
+<h1 id="18-print-the-table"><a class="header" href="#18-print-the-table">18. Print the table</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn print(&amp;self) { ... }
+<span class="boring">}</span></code></pre>
+<p>We print row by row using <code>get()</code>.</p>
+<hr>
+<h1 id="what-you-just-learned"><a class="header" href="#what-you-just-learned">What you just learned</a></h1>
+<p>✅ struct and impl<br>✅ ownership and mutability<br>✅ error handling<br>✅ Result types<br>✅ memory layout<br>✅ parsing input<br>✅ index computation</p>
+<hr>
+<h1 id="why-this-matters"><a class="header" href="#why-this-matters">Why this matters</a></h1>
+<p>Everything advanced depends on this:</p>
+<ul>
+<li>distance computation</li>
+<li>k-means</li>
+<li>PCA</li>
+<li>scaling</li>
+<li>dot products</li>
+</ul>
+<p>If you understand this file — you understand the backbone of Rust-based numeric computing.</p>
+<hr>
+<h1 id="next"><a class="header" href="#next">Next</a></h1>
+<p>Next chapter:
+<strong>Distance metrics and vector math in Rust</strong></p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
+                            <a rel="prev" href="create_table_with_code.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                            </a>
 
+                            <a rel="next prefetch" href="kmeans_math_fix.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -192,7 +440,13 @@
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
+                    <a rel="prev" href="create_table_with_code.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
+                    </a>
 
+                    <a rel="next prefetch" href="kmeans_math_fix.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
+                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
+                    </a>
             </nav>
 
         </div>

@@ -30,16 +30,18 @@
 
         <!-- Custom theme stylesheets -->
 
+        <!-- MathJax -->
+        <script async src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-AMS-MML_HTMLorMML"></script>
 
         <!-- Provide site root and default themes to javascript -->
         <script>
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-8d2b30ac.js";
+            window.path_to_searchindex_js = "searchindex-69c4c719.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-b9f95d9b.js"></script>
+        <script src="toc-4e54c138.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -353,6 +355,657 @@ expected u8, found u16
 <h1 id="summary"><a class="header" href="#summary">Summary</a></h1>
 <p>✅ Variables<br>✅ Mutability<br>✅ Types<br>✅ Strings<br>✅ Vectors &amp; Maps<br>✅ Ownership<br>✅ Helpful compiler</p>
 <p>Rust forces correctness early.</p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="creating-a-rust-package-and-loading-data-hands-on"><a class="header" href="#creating-a-rust-package-and-loading-data-hands-on">Creating a Rust Package and Loading Data (Hands-On)</a></h1>
+<p>In this chapter we <strong>build a real Rust package</strong> that loads a numeric table from disk
+and stores it in a data structure we can later use for clustering (e.g. k-means).</p>
+<p>You will:</p>
+<p>✅ create a Rust package<br>✅ write a real data table struct<br>✅ load a file<br>✅ parse numeric values<br>✅ handle errors<br>✅ test your code</p>
+<p>This chapter is not theory. You will <strong>type this code</strong>.</p>
+<hr>
+<h1 id="1-create-a-new-package"><a class="header" href="#1-create-a-new-package">1. Create a new package</a></h1>
+<p>Open a terminal:</p>
+<pre><code class="language-bash">cargo new data_table --bin
+cd data_table
+</code></pre>
+<p>Project structure:</p>
+<pre><code>data_table/
+└── src/
+    └── main.rs
+</code></pre>
+<hr>
+<h1 id="2-add-dependencies"><a class="header" href="#2-add-dependencies">2. Add dependencies</a></h1>
+<p>Edit <code>Cargo.toml</code>:</p>
+<pre><code class="language-toml">[package]
+name = "data_table"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+</code></pre>
+<hr>
+<h1 id="3-create-module-structure"><a class="header" href="#3-create-module-structure">3. Create module structure</a></h1>
+<p>Create two new files:</p>
+<pre><code>src/
+  main.rs
+  lib.rs
+  data.rs
+</code></pre>
+<hr>
+<h1 id="4-hook-the-library-into-rust"><a class="header" href="#4-hook-the-library-into-rust">4. Hook the library into Rust</a></h1>
+<p>Edit <code>src/lib.rs</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub mod data;
+<span class="boring">}</span></code></pre>
+<p>This tells Rust that <code>data.rs</code> is part of your package.</p>
+<hr>
+<h1 id="5-implement-the-data-table"><a class="header" href="#5-implement-the-data-table">5. Implement the data table</a></h1>
+<p>Edit <code>src/data.rs</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::fs::File;
+use std::io::{BufRead, BufReader};
+
+/// A simple numeric table
+pub struct DataTable {
+    pub rows: usize,
+    pub cols: usize,
+    pub rownames: Vec&lt;String&gt;,
+    pub data: Vec&lt;f64&gt;,
+}
+
+impl DataTable {
+    /// Create a new empty table
+    pub fn new() -&gt; Self {
+        Self {
+            rows: 0,
+            cols: 0,
+            rownames: Vec::new(),
+            data: Vec::new(),
+        }
+    }
+
+    /// Load a TSV or CSV file
+    pub fn read_file(path: &amp;str, sep: char) -&gt; Self {
+        let file = File::open(path).expect("Cannot open file");
+        let reader = BufReader::new(file);
+
+        let mut table = DataTable::new();
+        let mut header = true;
+
+        for line in reader.lines() {
+            let line = line.expect("Read error");
+
+            // Skip header line
+            if header {
+                header = false;
+                continue;
+            }
+
+            let mut first = true;
+            let mut col_count = 0;
+
+            for mut val in line.split(sep) {
+                if first {
+                    table.rownames.push(val.to_string());
+                    first = false;
+                } else {
+                    val = val.trim();
+                    let v = match val.parse::&lt;f64&gt;() {
+                        Ok(n) =&gt; n,
+                        Err(_) =&gt; 0.0,
+                    };
+                    table.data.push(v);
+                    col_count += 1;
+                }
+            }
+
+            if table.cols == 0 {
+                table.cols = col_count;
+            }
+
+            table.rows += 1;
+        }
+
+        table
+    }
+
+    pub fn get(&amp;self, row: usize, col: usize) -&gt; f64 {
+        self.data[row * self.cols + col]
+    }
+
+    pub fn print(&amp;self) {
+        println!("rows: {}, cols: {}", self.rows, self.cols);
+
+        for r in 0..self.rows {
+            print!("{}\t", self.rownames[r]);
+            for c in 0..self.cols {
+                print!("{}\t", self.get(r, c));
+            }
+            println!();
+        }
+    }
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="6-explain-what-just-happened"><a class="header" href="#6-explain-what-just-happened">6. Explain what just happened</a></h1>
+<h2 id="the-struct"><a class="header" href="#the-struct">The struct</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct DataTable {
+    pub rows: usize,
+    pub cols: usize,
+    pub rownames: Vec&lt;String&gt;,
+    pub data: Vec&lt;f64&gt;,
+}
+<span class="boring">}</span></code></pre>
+<p>This is your first real <strong>data structure</strong>.</p>
+<p>We store:</p>
+<ul>
+<li>dimensions</li>
+<li>names</li>
+<li>flattened numeric matrix (<code>data</code>)</li>
+</ul>
+<p>This layout is efficient and perfect for k-means later.</p>
+<hr>
+<h2 id="parsing-numbers-safely"><a class="header" href="#parsing-numbers-safely">Parsing numbers safely</a></h2>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let v = match val.parse::&lt;f64&gt;() {
+    Ok(n) =&gt; n,
+    Err(_) =&gt; 0.0,
+};
+<span class="boring">}</span></code></pre>
+<p>Rust refuses to assume input is valid.
+We choose to replace invalid values with <code>0.0</code>.</p>
+<hr>
+<h2 id="memory-layout"><a class="header" href="#memory-layout">Memory layout</a></h2>
+<p>Indexing logic:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>row * cols + col
+<span class="boring">}</span></code></pre>
+<p>This stores the table <strong>row-major</strong> — just like NumPy and C.</p>
+<hr>
+<h1 id="7-write-the-executable"><a class="header" href="#7-write-the-executable">7. Write the executable</a></h1>
+<p>Edit <code>src/main.rs</code>:</p>
+<pre class="playground"><code class="language-rust">use clap::Parser;
+use data_table::data::DataTable;
+
+#[derive(Parser)]
+struct Opts {
+    #[arg(short, long)]
+    data: String,
+
+    #[arg(short, long, default_value = "\t")]
+    sep: String,
+}
+
+fn main() {
+    let opts = Opts::parse();
+    let sep: char = opts.sep.chars().next().unwrap();
+
+    let table = DataTable::read_file(&amp;opts.data, sep);
+    table.print();
+}</code></pre>
+<hr>
+<h1 id="8-build-the-program"><a class="header" href="#8-build-the-program">8. Build the program</a></h1>
+<pre><code class="language-bash">cargo build -r
+</code></pre>
+<hr>
+<h1 id="9-run-on-a-real-file"><a class="header" href="#9-run-on-a-real-file">9. Run on a real file</a></h1>
+<p>Example <code>data.tsv</code>:</p>
+<pre><code>gene A B C
+g1 1.1 2.3 4.5
+g2 4.0 0.2 1.8
+</code></pre>
+<p>Run:</p>
+<pre><code class="language-bash">target/release/data_table -d data.tsv
+</code></pre>
+<p>You should see the table printed.</p>
+<hr>
+<h1 id="10-tests-you-should-test-your-code"><a class="header" href="#10-tests-you-should-test-your-code">10. Tests (you SHOULD test your code)</a></h1>
+<p>Add to <code>src/data.rs</code>:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_mock_table() {
+        let input = "x\ta\tb\nc1\t1\t2\nc2\t3\t4";
+        std::fs::write("/tmp/test.tsv", input).unwrap();
+
+        let t = DataTable::read_file("/tmp/test.tsv", '\t');
+        assert_eq!(t.rows, 2);
+        assert_eq!(t.cols, 2);
+        assert_eq!(t.get(1, 1), 4.0);
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>Run:</p>
+<pre><code class="language-bash">cargo test
+</code></pre>
+<hr>
+<h1 id="summary-1"><a class="header" href="#summary-1">Summary</a></h1>
+<p>You now built:</p>
+<p>✅ a real package<br>✅ a real data structure<br>✅ file parsing<br>✅ error handling<br>✅ indexing logic<br>✅ a test suite</p>
+<p>This is the foundation for:</p>
+<blockquote>
+<p>clustering, PCA, k-means, distance computation</p>
+</blockquote>
+<hr>
+<h1 id="next"><a class="header" href="#next">Next</a></h1>
+<p>Next chapter:
+<strong>Computing distances and centroids</strong></p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="walking-through-the-datatable-code-line-by-line"><a class="header" href="#walking-through-the-datatable-code-line-by-line">Walking Through the DataTable Code (Line by Line)</a></h1>
+<p>In this section we walk slowly and carefully through the <strong>entire <code>DataTable</code> implementation</strong>.
+This is the heart of your program. Understanding this file means you understand how Rust stores data.</p>
+<hr>
+<h1 id="1-importing-filesystem-and-io-tools"><a class="header" href="#1-importing-filesystem-and-io-tools">1. Importing filesystem and IO tools</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>use std::fs::File;
+use std::io::{BufRead, BufReader};
+<span class="boring">}</span></code></pre>
+<p>These two lines bring in tools from Rust’s standard library:</p>
+<ul>
+<li><code>File</code> → open files from disk</li>
+<li><code>BufReader</code> → read files efficiently, line by line</li>
+<li><code>BufRead</code> → gives us <code>.lines()</code> to iterate over file lines</li>
+</ul>
+<p>Rust requires imports explicitly — nothing is magically available.</p>
+<hr>
+<h1 id="2-defining-the-datatable-structure"><a class="header" href="#2-defining-the-datatable-structure">2. Defining the DataTable structure</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub struct DataTable {
+    pub rows: usize,
+    pub cols: usize,
+    pub rownames: Vec&lt;String&gt;,
+    pub data: Vec&lt;f64&gt;,
+}
+<span class="boring">}</span></code></pre>
+<p>This defines a <strong>data structure</strong>.</p>
+<p>We store:</p>
+<ul>
+<li><code>rows</code> → number of rows</li>
+<li><code>cols</code> → number of columns</li>
+<li><code>rownames</code> → first column (e.g. gene names)</li>
+<li><code>data</code> → numeric values stored in one flat vector</li>
+</ul>
+<p>Rust does not have <em>classes</em> — it has <strong>structs</strong> and <code>impl</code> blocks.</p>
+<p>This design is intentional:</p>
+<p>We store the table as:</p>
+<pre><code>row-major order (flattened matrix)
+</code></pre>
+<p>Indexing is done by:</p>
+<pre><code>row * cols + col
+</code></pre>
+<p>Which makes numeric computation fast later.</p>
+<hr>
+<h1 id="3-constructor-creating-an-empty-table"><a class="header" href="#3-constructor-creating-an-empty-table">3. Constructor: creating an empty table</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn new() -&gt; Self {
+    Self {
+        rows: 0,
+        cols: 0,
+        rownames: Vec::new(),
+        data: Vec::new(),
+    }
+}
+<span class="boring">}</span></code></pre>
+<p>This function creates a new empty table.</p>
+<p>Notes:</p>
+<ul>
+<li><code>Self</code> refers to <code>DataTable</code></li>
+<li><code>Vec::new()</code> creates empty vectors</li>
+<li>We initialize dimensions with <code>0</code></li>
+</ul>
+<p>Rust does not allow uninitialized memory. Everything is always valid.</p>
+<hr>
+<h1 id="4-loading-a-file"><a class="header" href="#4-loading-a-file">4. Loading a file</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn read_file(path: &amp;str, sep: char) -&gt; Self {
+<span class="boring">}</span></code></pre>
+<p>Function parameters:</p>
+<ul>
+<li><code>path</code> → path to file</li>
+<li><code>sep</code> → column separator (e.g. <code>\t</code> for TSV, <code>,</code> for CSV)</li>
+</ul>
+<p>Return value:</p>
+<pre><code>Self = DataTable
+</code></pre>
+<hr>
+<h1 id="5-open-and-wrap-the-file"><a class="header" href="#5-open-and-wrap-the-file">5. Open and wrap the file</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let file = File::open(path).expect("Cannot open file");
+let reader = BufReader::new(file);
+<span class="boring">}</span></code></pre>
+<ul>
+<li><code>File::open()</code> returns a <code>Result</code></li>
+<li><code>.expect()</code> crashes gracefully with a readable message</li>
+<li><code>BufReader</code> improves performance for large files</li>
+</ul>
+<hr>
+<h1 id="6-setting-up-state"><a class="header" href="#6-setting-up-state">6. Setting up state</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut table = DataTable::new();
+let mut header = true;
+<span class="boring">}</span></code></pre>
+<p>We prepare:</p>
+<ul>
+<li>an empty table</li>
+<li>a flag to skip the header row</li>
+</ul>
+<p>Rust forces explicit mutability:</p>
+<p><code>mut</code> → this value will change.</p>
+<hr>
+<h1 id="7-reading-line-by-line"><a class="header" href="#7-reading-line-by-line">7. Reading line by line</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>for line in reader.lines() {
+    let line = line.expect("Read error");
+<span class="boring">}</span></code></pre>
+<p>Why <code>expect()</code> again?</p>
+<p>Because:</p>
+<pre><code>line is Result&lt;String, Error&gt;
+</code></pre>
+<p>Rust never ignores failure.</p>
+<hr>
+<h1 id="8-skipping-header"><a class="header" href="#8-skipping-header">8. Skipping header</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if header {
+    header = false;
+    continue;
+}
+<span class="boring">}</span></code></pre>
+<p>We drop the first line and move on.</p>
+<hr>
+<h1 id="9-parsing-a-row"><a class="header" href="#9-parsing-a-row">9. Parsing a row</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let mut first = true;
+let mut col_count = 0;
+<span class="boring">}</span></code></pre>
+<p>Flags:</p>
+<ul>
+<li><code>first</code> → first column = row name</li>
+<li><code>col_count</code> → how many numeric columns did we see?</li>
+</ul>
+<hr>
+<h1 id="10-splitting-each-cell"><a class="header" href="#10-splitting-each-cell">10. Splitting each cell</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>for mut val in line.split(sep) {
+<span class="boring">}</span></code></pre>
+<ul>
+<li><code>.split(sep)</code> breaks the line</li>
+<li><code>mut val</code> because we want to overwrite it</li>
+<li>Each <code>val</code> is <code>&amp;str</code></li>
+</ul>
+<hr>
+<h1 id="11-first-column-row-names"><a class="header" href="#11-first-column-row-names">11. First column: row names</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if first {
+    table.rownames.push(val.to_string());
+    first = false;
+}
+<span class="boring">}</span></code></pre>
+<p>The first field is the row label.</p>
+<hr>
+<h1 id="12-parsing-numeric-values"><a class="header" href="#12-parsing-numeric-values">12. Parsing numeric values</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>val = val.trim();
+
+let v = match val.parse::&lt;f64&gt;() {
+    Ok(n) =&gt; n,
+    Err(_) =&gt; 0.0,
+};
+<span class="boring">}</span></code></pre>
+<p>Rust will NOT guess.
+Rust will NOT fake conversion.
+Rust forces correctness.</p>
+<p>If parsing fails:
+→ we replace with <code>0.0</code>.</p>
+<hr>
+<h1 id="13-store-values"><a class="header" href="#13-store-values">13. Store values</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>table.data.push(v);
+col_count += 1;
+<span class="boring">}</span></code></pre>
+<p>We append values in row-major order.</p>
+<hr>
+<h1 id="14-set-column-count-once"><a class="header" href="#14-set-column-count-once">14. Set column count once</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>if table.cols == 0 {
+    table.cols = col_count;
+}
+<span class="boring">}</span></code></pre>
+<p>We set column count only for the first row.</p>
+<hr>
+<h1 id="15-increase-row-count"><a class="header" href="#15-increase-row-count">15. Increase row count</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>table.rows += 1;
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="16-return-the-object"><a class="header" href="#16-return-the-object">16. Return the object</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>table
+<span class="boring">}</span></code></pre>
+<p>Final expression = return value.</p>
+<p>No <code>return</code> keyword needed.</p>
+<hr>
+<h1 id="17-random-access-get-value"><a class="header" href="#17-random-access-get-value">17. Random access: get value</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn get(&amp;self, row: usize, col: usize) -&gt; f64 {
+    self.data[row * self.cols + col]
+}
+<span class="boring">}</span></code></pre>
+<p>This computes the index into the flat array.</p>
+<p>Memory layout:</p>
+<pre><code>[ row0 | row1 | row2 | ... ]
+</code></pre>
+<hr>
+<h1 id="18-print-the-table"><a class="header" href="#18-print-the-table">18. Print the table</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>pub fn print(&amp;self) { ... }
+<span class="boring">}</span></code></pre>
+<p>We print row by row using <code>get()</code>.</p>
+<hr>
+<h1 id="what-you-just-learned"><a class="header" href="#what-you-just-learned">What you just learned</a></h1>
+<p>✅ struct and impl<br>✅ ownership and mutability<br>✅ error handling<br>✅ Result types<br>✅ memory layout<br>✅ parsing input<br>✅ index computation</p>
+<hr>
+<h1 id="why-this-matters"><a class="header" href="#why-this-matters">Why this matters</a></h1>
+<p>Everything advanced depends on this:</p>
+<ul>
+<li>distance computation</li>
+<li>k-means</li>
+<li>PCA</li>
+<li>scaling</li>
+<li>dot products</li>
+</ul>
+<p>If you understand this file — you understand the backbone of Rust-based numeric computing.</p>
+<hr>
+<h1 id="next-1"><a class="header" href="#next-1">Next</a></h1>
+<p>Next chapter:
+<strong>Distance metrics and vector math in Rust</strong></p>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="k-means-clustering--mathematical-introduction-mdbook-compatible"><a class="header" href="#k-means-clustering--mathematical-introduction-mdbook-compatible">K-Means Clustering — Mathematical Introduction (mdBook Compatible)</a></h1>
+<p>This version uses <strong>mdBook-compatible math formatting</strong> (single <code>$</code> and <code>$$</code> blocks).</p>
+<hr>
+<h1 id="1-what-is-k-means"><a class="header" href="#1-what-is-k-means">1. What is k-means?</a></h1>
+<p>k-means is an <strong>unsupervised clustering algorithm</strong>.</p>
+<p>You provide:</p>
+<ul>
+<li>a numeric data matrix</li>
+<li>a number <code>k</code> (number of clusters)</li>
+</ul>
+<p>The algorithm finds:</p>
+<blockquote>
+<p>Clusters where distances within clusters are minimal and distances between clusters are maximal.</p>
+</blockquote>
+<hr>
+<h1 id="2-data-representation"><a class="header" href="#2-data-representation">2. Data Representation</a></h1>
+<p>Each row in the data table is a vector:</p>
+<p>$$
+x_i = (x_{i1}, x_{i2}, …, x_{in})
+$$</p>
+<p>Where:</p>
+<ul>
+<li>$i$ = data point index</li>
+<li>$n$ = number of columns (features)</li>
+</ul>
+<hr>
+<h1 id="3-distance-function-euclidean"><a class="header" href="#3-distance-function-euclidean">3. Distance Function (Euclidean)</a></h1>
+<p>For two vectors:</p>
+<p>$$
+x = (x_1, x_2, …, x_n)
+$$</p>
+<p>$$
+y = (y_1, y_2, …, y_n)
+$$</p>
+<p>Distance:</p>
+<p>$$
+d(x,y) = \sqrt{\sum_{k=1}^{n} (x_k - y_k)^2}
+$$</p>
+<p>Rust goal:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn euclidean(a: &amp;[f64], b: &amp;[f64]) -&gt; f64
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="4-clusters-and-centroids"><a class="header" href="#4-clusters-and-centroids">4. Clusters and Centroids</a></h1>
+<p>Each cluster has a centroid:</p>
+<p>$$
+\mu_j = (\mu_{j1}, \mu_{j2}, …, \mu_{jn})
+$$</p>
+<p>Centroid definition:</p>
+<p>$$
+\mu_{jk} = \frac{1}{|C_j|} \sum_{x \in C_j} x_k
+$$</p>
+<p>Where:</p>
+<ul>
+<li>$C_j$: points assigned to cluster j</li>
+<li>$|C_j|$: size of the cluster</li>
+<li>$k$: column index</li>
+</ul>
+<p>Rust goal:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn recompute_centroid(points: &amp;[usize], data: &amp;DataTable) -&gt; Vec&lt;f64&gt;
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="5-algorithm-steps-mathematical-form"><a class="header" href="#5-algorithm-steps-mathematical-form">5. Algorithm Steps (Mathematical Form)</a></h1>
+<h2 id="step-1-initialize-centroids"><a class="header" href="#step-1-initialize-centroids">Step 1: Initialize Centroids</a></h2>
+<p>Choose $k$ initial points:</p>
+<p>$$
+\mu_1, \mu_2, …, \mu_k
+$$</p>
+<p>Rust goal:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn init_centroids(data: &amp;DataTable, k: usize) -&gt; Vec&lt;Vec&lt;f64&gt;&gt;
+<span class="boring">}</span></code></pre>
+<hr>
+<h2 id="step-2-assign-points"><a class="header" href="#step-2-assign-points">Step 2: Assign Points</a></h2>
+<p>Each point is assigned to nearest centroid:</p>
+<p>$$
+cluster(x_i) = \arg\min_j d(x_i, \mu_j)
+$$</p>
+<p>Rust goal:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn assign_clusters(data: &amp;DataTable, centroids: &amp;[Vec&lt;f64&gt;]) -&gt; Vec&lt;usize&gt;
+<span class="boring">}</span></code></pre>
+<hr>
+<h2 id="step-3-update-centroids"><a class="header" href="#step-3-update-centroids">Step 3: Update Centroids</a></h2>
+<p>$$
+\mu_j = \frac{1}{|C_j|} \sum_{x \in C_j} x
+$$</p>
+<p>Rust goal:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn update_centroids(assignments: &amp;[usize], data: &amp;DataTable, k: usize) -&gt; Vec&lt;Vec&lt;f64&gt;&gt;
+<span class="boring">}</span></code></pre>
+<hr>
+<h2 id="step-4-convergence"><a class="header" href="#step-4-convergence">Step 4: Convergence</a></h2>
+<p>Stop when centroids no longer shift significantly.</p>
+<p>Centroid movement:</p>
+<p>$$
+\Delta = \sum_{j=1}^{k} || \mu_j^{(old)} - \mu_j^{(new)} ||
+$$</p>
+<p>Rust goal:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn has_converged(old: &amp;[Vec&lt;f64&gt;], new: &amp;[Vec&lt;f64&gt;], tol: f64) -&gt; bool
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="6-objective-function"><a class="header" href="#6-objective-function">6. Objective Function</a></h1>
+<p>K-means minimizes <strong>within-cluster sum of squares</strong>:</p>
+<p>$$
+J = \sum_{j=1}^{k} \sum_{x \in C_j} || x - \mu_j ||^2
+$$</p>
+<hr>
+<h1 id="7-pseudocode"><a class="header" href="#7-pseudocode">7. Pseudocode</a></h1>
+<pre><code>initialize centroids
+repeat:
+    assign points
+    recompute centroids
+until converged
+</code></pre>
+<hr>
+<h1 id="8-common-problems"><a class="header" href="#8-common-problems">8. Common Problems</a></h1>
+<ul>
+<li>Bad initialization</li>
+<li>Wrong number of clusters</li>
+<li>Different feature scales</li>
+</ul>
+<p>Fixes:</p>
+<ul>
+<li>k-means++ (later)</li>
+<li>normalization</li>
+<li>silhouette score</li>
+</ul>
+<hr>
+<h1 id="9-mapping-mathematics-to-rust"><a class="header" href="#9-mapping-mathematics-to-rust">9. Mapping mathematics to Rust</a></h1>
+<div class="table-wrapper">
+<table>
+<thead>
+<tr><th>Math</th><th>Rust</th></tr>
+</thead>
+<tbody>
+<tr><td>$d(x,y)$</td><td><code>euclidean()</code></td></tr>
+<tr><td>$\arg\min$</td><td><code>assign_clusters()</code></td></tr>
+<tr><td>mean</td><td><code>update_centroids()</code></td></tr>
+<tr><td>movement</td><td><code>has_converged()</code></td></tr>
+<tr><td>algorithm</td><td><code>kmeans()</code></td></tr>
+</tbody>
+</table>
+</div>
+<hr>
+<h1 id="next-chapter"><a class="header" href="#next-chapter">Next Chapter</a></h1>
+<p>Implement:</p>
+<blockquote>
+<p>Distance functions in Rust</p>
+</blockquote>
 
                     </main>
 
@@ -396,7 +1049,9 @@ expected u8, found u16
 
         <script>
         window.addEventListener('load', function() {
-            window.setTimeout(window.print, 100);
+            MathJax.Hub.Register.StartupHook('End', function() {
+                window.setTimeout(window.print, 100);
+            });
         });
         </script>
 
