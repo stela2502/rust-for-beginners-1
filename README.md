@@ -10,7 +10,7 @@ The tutorial is written using **mdBook** and published as a static website via G
 
 You can view the rendered HTML version here:
 
-➡️ **https://YOUR_GITHUB_NAME.github.io/YOUR_REPO_NAME**
+➡️ **https://stela2502.github.io/YOUR_REPO_NAME**
 
 (Replace with your actual GitHub Pages URL once enabled.)
 
@@ -22,7 +22,7 @@ If you want to work with this tutorial locally:
 
 ### 1. Clone the repository
 ```bash
-git clone https://github.com/YOUR_GITHUB_NAME/YOUR_REPO_NAME.git
+git clone https://github.com/stela2502/YOUR_REPO_NAME.git
 cd YOUR_REPO_NAME
 ```
 
