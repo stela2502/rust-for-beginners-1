@@ -25,3 +25,11 @@ What I found most important for my work is to try to understand code I have not 
 
 But first you need the Rust compiler. Best is - if you not already have it to follow [the official axplanations](https://rust-lang.org/tools/install/).
 In addition I do recommend a programming GUI like the [SublimeText](https://www.sublimetext.com/download) and [SublimeMerge](https://www.sublimemerge.com/download) combination I use since years.
+
+On windows I have seen an issue with a missing C++ linker.
+
+You can install the missing linker and it's libraries using windet:
+
+```
+winget install Microsoft.VisualStudio.2022.BuildTools
+```

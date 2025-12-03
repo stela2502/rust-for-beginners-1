@@ -1,3 +1,5 @@
+
+
 # Variables in Rust (Hands-On and Practical)
 
 Let’s forget theory for a moment and just *touch* Rust.
