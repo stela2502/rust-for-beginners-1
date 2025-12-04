@@ -5,3 +5,4 @@
 - [Create a Rust Package](create_table_with_code.md)
 - [Detailed - how does the function work?](walkthrough_datatable.md)
 - [What is Kmeans and how to implement that](kmeans_math_fix.md)
+- [Implement the kmeans function](kmeans_rust_impl.md)
