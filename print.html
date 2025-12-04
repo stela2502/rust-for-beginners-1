@@ -38,10 +38,10 @@
             const path_to_root = "";
             const default_light_theme = "light";
             const default_dark_theme = "navy";
-            window.path_to_searchindex_js = "searchindex-69c4c719.js";
+            window.path_to_searchindex_js = "searchindex-e5cafe73.js";
         </script>
         <!-- Start loading toc.js asap -->
-        <script src="toc-4e54c138.js"></script>
+        <script src="toc-5780e40e.js"></script>
     </head>
     <body>
     <div id="mdbook-help-container">
@@ -1006,6 +1006,197 @@ until converged
 <blockquote>
 <p>Distance functions in Rust</p>
 </blockquote>
+<div style="break-before: page; page-break-before: always;"></div>
+<h1 id="implementing-k-means-in-rust-flat-vec-version"><a class="header" href="#implementing-k-means-in-rust-flat-vec-version">Implementing k-Means in Rust (Flat Vec Version)</a></h1>
+<p>In this chapter we implement <strong>k-means completely</strong> using the <code>DataTable</code> from before.
+To make the data access less error prone we should implement an <code>idx(row,col)</code> function in out data object.
+Do you dare to do that without help? The function should simply return row * self.cols + col. Let’s do this!</p>
+<details>
+<summary><b>Spoiler: Show idx() implementation</b></summary>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>impl DataTable {
+    fn idx(&amp;self, row: usize, col: usize) -&gt; usize {
+        row * self.cols + col
+    }
+
+    pub fn get(&amp;self, row: usize, col: usize) -&gt; f64 {
+        self.data[self.idx(row, col)]
+    }
+}
+<span class="boring">}</span></code></pre>
+</details>
+---
+<h2 id="1-distance-function"><a class="header" href="#1-distance-function">1. Distance Function</a></h2>
+<p>We start with Euclidean distance between rows:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn euclidean(table: &amp;DataTable, a: usize, b: usize) -&gt; f64 {
+    let mut sum = 0.0;
+
+    for k in 0..table.cols {
+        let d = table.get(a, k) - table.get(b, k);
+        sum += d * d;
+    }
+
+    sum.sqrt()
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="2-representing-centroids"><a class="header" href="#2-representing-centroids">2. Representing Centroids</a></h1>
+<p>Centroids are just vectors:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>type Centroid = Vec&lt;f64&gt;;
+<span class="boring">}</span></code></pre>
+<details>
+<summary><b>A short note on `type` and separating data from results</b></summary>
+<p>In Rust, the <code>type</code> keyword lets you create a <strong>type alias</strong> – a new name for an existing type – so <code>type Centroid = Vec&lt;f64&gt;;</code> simply says “this vector of numbers represents a centroid”, without changing how it is stored or how fast it is. We deliberately keep centroids separate from <code>DataTable</code>, because <code>DataTable</code> is the <strong>raw input data</strong> (rows with names and identity), while centroids are <strong>derived results</strong> of the algorithm that have no row names and form a smaller <code>k × D</code> model in the same feature space. Keeping these as different types teaches a clean mental model: your original measurements live in one well-defined structure, and everything computed from them (like centroids and cluster assignments) lives in clearly separate result types. This separation makes your code easier to reason about, easier to extend later, and helps beginners avoid the common mistake of mixing “data” and “model” into the same container just because the numbers happen to have the same dimension.</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>// Give meaning to the numeric vector:
+type Centroid = Vec&lt;f64&gt;;      // one centroid (a point in feature space)
+type Centroids = Vec&lt;Centroid&gt;; // all centroids, i.e. the model
+<span class="boring">}</span></code></pre>
+</details>
+---
+<h1 id="3-initialize-centroids"><a class="header" href="#3-initialize-centroids">3. Initialize Centroids</a></h1>
+<p>Pick the first <code>k</code> rows:</p>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn init_centroids(table: &amp;DataTable, k: usize) -&gt; Vec&lt;Centroid&gt; {
+    let mut centroids = Vec::new();
+
+    for i in 0..k {
+        let mut c = Vec::new();
+        for col in 0..table.cols {
+            c.push(table.get(i, col));
+        }
+        centroids.push(c);
+    }
+
+    centroids
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="4-assign-clusters"><a class="header" href="#4-assign-clusters">4. Assign Clusters</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn assign_clusters(table: &amp;DataTable, centroids: &amp;[Centroid]) -&gt; Vec&lt;usize&gt; {
+    let mut assignment = vec![0; table.rows];
+
+    for i in 0..table.rows {
+        let mut best = 0;
+        let mut best_dist = f64::INFINITY;
+
+        for (j, c) in centroids.iter().enumerate() {
+            let mut sum = 0.0;
+
+            for k in 0..table.cols {
+                let d = table.get(i, k) - c[k];
+                sum += d * d;
+            }
+
+            let dist = sum.sqrt();
+
+            if dist &lt; best_dist {
+                best_dist = dist;
+                best = j;
+            }
+        }
+
+        assignment[i] = best;
+    }
+
+    assignment
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="6-update-centroids"><a class="header" href="#6-update-centroids">6. Update Centroids</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn update_centroids(table: &amp;DataTable, assignment: &amp;[usize], k: usize) -&gt; Vec&lt;Centroid&gt; {
+    let mut sums = vec![vec![0.0; table.cols]; k];
+    let mut counts = vec![0usize; k];
+
+    for i in 0..table.rows {
+        let cl = assignment[i];
+        counts[cl] += 1;
+
+        for col in 0..table.cols {
+            sums[cl][col] += table.get(i, col);
+        }
+    }
+
+    for j in 0..k {
+        if counts[j] &gt; 0 {
+            for col in 0..table.cols {
+                sums[j][col] /= counts[j] as f64;
+            }
+        }
+    }
+
+    sums
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="7-convergence-check"><a class="header" href="#7-convergence-check">7. Convergence Check</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn converged(old: &amp;[Centroid], new: &amp;[Centroid], tol: f64) -&gt; bool {
+    let mut shift = 0.0;
+
+    for j in 0..old.len() {
+        for k in 0..old[0].len() {
+            let d = old[j][k] - new[j][k];
+            shift += d * d;
+        }
+    }
+
+    shift.sqrt() &lt; tol
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="8-full-algorithm"><a class="header" href="#8-full-algorithm">8. Full Algorithm</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn kmeans(table: &amp;DataTable, k: usize, max_iter: usize, tol: f64) -&gt; Vec&lt;usize&gt; {
+    let mut centroids = init_centroids(table, k);
+    let mut assignment = vec![0; table.rows];
+
+    for _ in 0..max_iter {
+        let new_assignment = assign_clusters(table, &amp;centroids);
+        let new_centroids = update_centroids(table, &amp;new_assignment, k);
+
+        if converged(&amp;centroids, &amp;new_centroids, tol) {
+            println!("Converged.");
+            return new_assignment;
+        }
+
+        centroids = new_centroids;
+        assignment = new_assignment;
+    }
+
+    assignment
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="9-hook-it-into-mainrs"><a class="header" href="#9-hook-it-into-mainrs">9. Hook it into main.rs</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let clusters = kmeans(&amp;table, 3, 100, 1e-4);
+
+for (i, c) in clusters.iter().enumerate() {
+    println!("Row {} -&gt; cluster {}", i, c);
+}
+<span class="boring">}</span></code></pre>
+<hr>
+<h1 id="summary-2"><a class="header" href="#summary-2">Summary</a></h1>
+<p>You now implemented:</p>
+<p>✅ Euclidean distance<br>✅ assignment<br>✅ centroid update<br>✅ convergence<br>✅ full k-means</p>
+<hr>
+<h1 id="next-2"><a class="header" href="#next-2">Next</a></h1>
+<p>k-means++ initialization or scaling.</p>
 
                     </main>
 

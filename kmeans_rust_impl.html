@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>What is Kmeans and how to implement that - Rust for Beginners (Bioinformatics)</title>
+        <title>Implement the kmeans function - Rust for Beginners (Bioinformatics)</title>
 
 
         <!-- Custom HTML head -->
@@ -176,176 +176,205 @@
 
                 <div id="mdbook-content" class="content">
                     <main>
-                        <h1 id="k-means-clustering--mathematical-introduction-mdbook-compatible"><a class="header" href="#k-means-clustering--mathematical-introduction-mdbook-compatible">K-Means Clustering — Mathematical Introduction (mdBook Compatible)</a></h1>
-<p>This version uses <strong>mdBook-compatible math formatting</strong> (single <code>$</code> and <code>$$</code> blocks).</p>
-<hr>
-<h1 id="1-what-is-k-means"><a class="header" href="#1-what-is-k-means">1. What is k-means?</a></h1>
-<p>k-means is an <strong>unsupervised clustering algorithm</strong>.</p>
-<p>You provide:</p>
-<ul>
-<li>a numeric data matrix</li>
-<li>a number <code>k</code> (number of clusters)</li>
-</ul>
-<p>The algorithm finds:</p>
-<blockquote>
-<p>Clusters where distances within clusters are minimal and distances between clusters are maximal.</p>
-</blockquote>
-<hr>
-<h1 id="2-data-representation"><a class="header" href="#2-data-representation">2. Data Representation</a></h1>
-<p>Each row in the data table is a vector:</p>
-<p>$$
-x_i = (x_{i1}, x_{i2}, …, x_{in})
-$$</p>
-<p>Where:</p>
-<ul>
-<li>$i$ = data point index</li>
-<li>$n$ = number of columns (features)</li>
-</ul>
-<hr>
-<h1 id="3-distance-function-euclidean"><a class="header" href="#3-distance-function-euclidean">3. Distance Function (Euclidean)</a></h1>
-<p>For two vectors:</p>
-<p>$$
-x = (x_1, x_2, …, x_n)
-$$</p>
-<p>$$
-y = (y_1, y_2, …, y_n)
-$$</p>
-<p>Distance:</p>
-<p>$$
-d(x,y) = \sqrt{\sum_{k=1}^{n} (x_k - y_k)^2}
-$$</p>
-<p>Rust goal:</p>
+                        <h1 id="implementing-k-means-in-rust-flat-vec-version"><a class="header" href="#implementing-k-means-in-rust-flat-vec-version">Implementing k-Means in Rust (Flat Vec Version)</a></h1>
+<p>In this chapter we implement <strong>k-means completely</strong> using the <code>DataTable</code> from before.
+To make the data access less error prone we should implement an <code>idx(row,col)</code> function in out data object.
+Do you dare to do that without help? The function should simply return row * self.cols + col. Let’s do this!</p>
+<details>
+<summary><b>Spoiler: Show idx() implementation</b></summary>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn euclidean(a: &amp;[f64], b: &amp;[f64]) -&gt; f64
+</span>impl DataTable {
+    fn idx(&amp;self, row: usize, col: usize) -&gt; usize {
+        row * self.cols + col
+    }
+
+    pub fn get(&amp;self, row: usize, col: usize) -&gt; f64 {
+        self.data[self.idx(row, col)]
+    }
+}
 <span class="boring">}</span></code></pre>
-<hr>
-<h1 id="4-clusters-and-centroids"><a class="header" href="#4-clusters-and-centroids">4. Clusters and Centroids</a></h1>
-<p>Each cluster has a centroid:</p>
-<p>$$
-\mu_j = (\mu_{j1}, \mu_{j2}, …, \mu_{jn})
-$$</p>
-<p>Centroid definition:</p>
-<p>$$
-\mu_{jk} = \frac{1}{|C_j|} \sum_{x \in C_j} x_k
-$$</p>
-<p>Where:</p>
-<ul>
-<li>$C_j$: points assigned to cluster j</li>
-<li>$|C_j|$: size of the cluster</li>
-<li>$k$: column index</li>
-</ul>
-<p>Rust goal:</p>
+</details>
+---
+<h2 id="1-distance-function"><a class="header" href="#1-distance-function">1. Distance Function</a></h2>
+<p>We start with Euclidean distance between rows:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn recompute_centroid(points: &amp;[usize], data: &amp;DataTable) -&gt; Vec&lt;f64&gt;
+</span>fn euclidean(table: &amp;DataTable, a: usize, b: usize) -&gt; f64 {
+    let mut sum = 0.0;
+
+    for k in 0..table.cols {
+        let d = table.get(a, k) - table.get(b, k);
+        sum += d * d;
+    }
+
+    sum.sqrt()
+}
 <span class="boring">}</span></code></pre>
 <hr>
-<h1 id="5-algorithm-steps-mathematical-form"><a class="header" href="#5-algorithm-steps-mathematical-form">5. Algorithm Steps (Mathematical Form)</a></h1>
-<h2 id="step-1-initialize-centroids"><a class="header" href="#step-1-initialize-centroids">Step 1: Initialize Centroids</a></h2>
-<p>Choose $k$ initial points:</p>
-<p>$$
-\mu_1, \mu_2, …, \mu_k
-$$</p>
-<p>Rust goal:</p>
+<h1 id="2-representing-centroids"><a class="header" href="#2-representing-centroids">2. Representing Centroids</a></h1>
+<p>Centroids are just vectors:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn init_centroids(data: &amp;DataTable, k: usize) -&gt; Vec&lt;Vec&lt;f64&gt;&gt;
+</span>type Centroid = Vec&lt;f64&gt;;
 <span class="boring">}</span></code></pre>
-<hr>
-<h2 id="step-2-assign-points"><a class="header" href="#step-2-assign-points">Step 2: Assign Points</a></h2>
-<p>Each point is assigned to nearest centroid:</p>
-<p>$$
-cluster(x_i) = \arg\min_j d(x_i, \mu_j)
-$$</p>
-<p>Rust goal:</p>
+<details>
+<summary><b>A short note on `type` and separating data from results</b></summary>
+<p>In Rust, the <code>type</code> keyword lets you create a <strong>type alias</strong> – a new name for an existing type – so <code>type Centroid = Vec&lt;f64&gt;;</code> simply says “this vector of numbers represents a centroid”, without changing how it is stored or how fast it is. We deliberately keep centroids separate from <code>DataTable</code>, because <code>DataTable</code> is the <strong>raw input data</strong> (rows with names and identity), while centroids are <strong>derived results</strong> of the algorithm that have no row names and form a smaller <code>k × D</code> model in the same feature space. Keeping these as different types teaches a clean mental model: your original measurements live in one well-defined structure, and everything computed from them (like centroids and cluster assignments) lives in clearly separate result types. This separation makes your code easier to reason about, easier to extend later, and helps beginners avoid the common mistake of mixing “data” and “model” into the same container just because the numbers happen to have the same dimension.</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn assign_clusters(data: &amp;DataTable, centroids: &amp;[Vec&lt;f64&gt;]) -&gt; Vec&lt;usize&gt;
+</span>// Give meaning to the numeric vector:
+type Centroid = Vec&lt;f64&gt;;      // one centroid (a point in feature space)
+type Centroids = Vec&lt;Centroid&gt;; // all centroids, i.e. the model
 <span class="boring">}</span></code></pre>
-<hr>
-<h2 id="step-3-update-centroids"><a class="header" href="#step-3-update-centroids">Step 3: Update Centroids</a></h2>
-<p>$$
-\mu_j = \frac{1}{|C_j|} \sum_{x \in C_j} x
-$$</p>
-<p>Rust goal:</p>
+</details>
+---
+<h1 id="3-initialize-centroids"><a class="header" href="#3-initialize-centroids">3. Initialize Centroids</a></h1>
+<p>Pick the first <code>k</code> rows:</p>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn update_centroids(assignments: &amp;[usize], data: &amp;DataTable, k: usize) -&gt; Vec&lt;Vec&lt;f64&gt;&gt;
+</span>fn init_centroids(table: &amp;DataTable, k: usize) -&gt; Vec&lt;Centroid&gt; {
+    let mut centroids = Vec::new();
+
+    for i in 0..k {
+        let mut c = Vec::new();
+        for col in 0..table.cols {
+            c.push(table.get(i, col));
+        }
+        centroids.push(c);
+    }
+
+    centroids
+}
 <span class="boring">}</span></code></pre>
 <hr>
-<h2 id="step-4-convergence"><a class="header" href="#step-4-convergence">Step 4: Convergence</a></h2>
-<p>Stop when centroids no longer shift significantly.</p>
-<p>Centroid movement:</p>
-<p>$$
-\Delta = \sum_{j=1}^{k} || \mu_j^{(old)} - \mu_j^{(new)} ||
-$$</p>
-<p>Rust goal:</p>
+<h1 id="4-assign-clusters"><a class="header" href="#4-assign-clusters">4. Assign Clusters</a></h1>
 <pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
 </span><span class="boring">fn main() {
-</span>fn has_converged(old: &amp;[Vec&lt;f64&gt;], new: &amp;[Vec&lt;f64&gt;], tol: f64) -&gt; bool
+</span>fn assign_clusters(table: &amp;DataTable, centroids: &amp;[Centroid]) -&gt; Vec&lt;usize&gt; {
+    let mut assignment = vec![0; table.rows];
+
+    for i in 0..table.rows {
+        let mut best = 0;
+        let mut best_dist = f64::INFINITY;
+
+        for (j, c) in centroids.iter().enumerate() {
+            let mut sum = 0.0;
+
+            for k in 0..table.cols {
+                let d = table.get(i, k) - c[k];
+                sum += d * d;
+            }
+
+            let dist = sum.sqrt();
+
+            if dist &lt; best_dist {
+                best_dist = dist;
+                best = j;
+            }
+        }
+
+        assignment[i] = best;
+    }
+
+    assignment
+}
 <span class="boring">}</span></code></pre>
 <hr>
-<h1 id="6-objective-function"><a class="header" href="#6-objective-function">6. Objective Function</a></h1>
-<p>K-means minimizes <strong>within-cluster sum of squares</strong>:</p>
-<p>$$
-J = \sum_{j=1}^{k} \sum_{x \in C_j} || x - \mu_j ||^2
-$$</p>
+<h1 id="6-update-centroids"><a class="header" href="#6-update-centroids">6. Update Centroids</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn update_centroids(table: &amp;DataTable, assignment: &amp;[usize], k: usize) -&gt; Vec&lt;Centroid&gt; {
+    let mut sums = vec![vec![0.0; table.cols]; k];
+    let mut counts = vec![0usize; k];
+
+    for i in 0..table.rows {
+        let cl = assignment[i];
+        counts[cl] += 1;
+
+        for col in 0..table.cols {
+            sums[cl][col] += table.get(i, col);
+        }
+    }
+
+    for j in 0..k {
+        if counts[j] &gt; 0 {
+            for col in 0..table.cols {
+                sums[j][col] /= counts[j] as f64;
+            }
+        }
+    }
+
+    sums
+}
+<span class="boring">}</span></code></pre>
 <hr>
-<h1 id="7-pseudocode"><a class="header" href="#7-pseudocode">7. Pseudocode</a></h1>
-<pre><code>initialize centroids
-repeat:
-    assign points
-    recompute centroids
-until converged
-</code></pre>
+<h1 id="7-convergence-check"><a class="header" href="#7-convergence-check">7. Convergence Check</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn converged(old: &amp;[Centroid], new: &amp;[Centroid], tol: f64) -&gt; bool {
+    let mut shift = 0.0;
+
+    for j in 0..old.len() {
+        for k in 0..old[0].len() {
+            let d = old[j][k] - new[j][k];
+            shift += d * d;
+        }
+    }
+
+    shift.sqrt() &lt; tol
+}
+<span class="boring">}</span></code></pre>
 <hr>
-<h1 id="8-common-problems"><a class="header" href="#8-common-problems">8. Common Problems</a></h1>
-<ul>
-<li>Bad initialization</li>
-<li>Wrong number of clusters</li>
-<li>Different feature scales</li>
-</ul>
-<p>Fixes:</p>
-<ul>
-<li>k-means++ (later)</li>
-<li>normalization</li>
-<li>silhouette score</li>
-</ul>
+<h1 id="8-full-algorithm"><a class="header" href="#8-full-algorithm">8. Full Algorithm</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>fn kmeans(table: &amp;DataTable, k: usize, max_iter: usize, tol: f64) -&gt; Vec&lt;usize&gt; {
+    let mut centroids = init_centroids(table, k);
+    let mut assignment = vec![0; table.rows];
+
+    for _ in 0..max_iter {
+        let new_assignment = assign_clusters(table, &amp;centroids);
+        let new_centroids = update_centroids(table, &amp;new_assignment, k);
+
+        if converged(&amp;centroids, &amp;new_centroids, tol) {
+            println!("Converged.");
+            return new_assignment;
+        }
+
+        centroids = new_centroids;
+        assignment = new_assignment;
+    }
+
+    assignment
+}
+<span class="boring">}</span></code></pre>
 <hr>
-<h1 id="9-mapping-mathematics-to-rust"><a class="header" href="#9-mapping-mathematics-to-rust">9. Mapping mathematics to Rust</a></h1>
-<div class="table-wrapper">
-<table>
-<thead>
-<tr><th>Math</th><th>Rust</th></tr>
-</thead>
-<tbody>
-<tr><td>$d(x,y)$</td><td><code>euclidean()</code></td></tr>
-<tr><td>$\arg\min$</td><td><code>assign_clusters()</code></td></tr>
-<tr><td>mean</td><td><code>update_centroids()</code></td></tr>
-<tr><td>movement</td><td><code>has_converged()</code></td></tr>
-<tr><td>algorithm</td><td><code>kmeans()</code></td></tr>
-</tbody>
-</table>
-</div>
+<h1 id="9-hook-it-into-mainrs"><a class="header" href="#9-hook-it-into-mainrs">9. Hook it into main.rs</a></h1>
+<pre class="playground"><code class="language-rust"><span class="boring">#![allow(unused)]
+</span><span class="boring">fn main() {
+</span>let clusters = kmeans(&amp;table, 3, 100, 1e-4);
+
+for (i, c) in clusters.iter().enumerate() {
+    println!("Row {} -&gt; cluster {}", i, c);
+}
+<span class="boring">}</span></code></pre>
 <hr>
-<h1 id="next-chapter"><a class="header" href="#next-chapter">Next Chapter</a></h1>
-<p>Implement:</p>
-<blockquote>
-<p>Distance functions in Rust</p>
-</blockquote>
+<h1 id="summary"><a class="header" href="#summary">Summary</a></h1>
+<p>You now implemented:</p>
+<p>✅ Euclidean distance<br>✅ assignment<br>✅ centroid update<br>✅ convergence<br>✅ full k-means</p>
+<hr>
+<h1 id="next"><a class="header" href="#next">Next</a></h1>
+<p>k-means++ initialization or scaling.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
-                            <a rel="prev" href="walkthrough_datatable.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="kmeans_math_fix.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                             </a>
 
-                            <a rel="next prefetch" href="kmeans_rust_impl.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
-                            </a>
 
                         <div style="clear: both"></div>
                     </nav>
@@ -353,13 +382,10 @@ until converged
             </div>
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
-                    <a rel="prev" href="walkthrough_datatable.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="kmeans_math_fix.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/></svg></span>
                     </a>
 
-                    <a rel="next prefetch" href="kmeans_rust_impl.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <span class=fa-svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 512"><!--! Font Awesome Free 6.2.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2022 Fonticons, Inc. --><path d="M278.6 233.4c12.5 12.5 12.5 32.8 0 45.3l-160 160c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3L210.7 256 73.4 118.6c-12.5-12.5-12.5-32.8 0-45.3s32.8-12.5 45.3 0l160 160z"/></svg></span>
-                    </a>
             </nav>
 
         </div>
